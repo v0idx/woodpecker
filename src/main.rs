@@ -1,5 +1,5 @@
 use clap::{Args, Parser, Subcommand, ValueEnum};
-use woodpecker::TodoList;
+use woodpecker_todo::TodoList;
 
 #[derive(Parser)]
 #[command(version, about, long_about=None)] // Read values from Cargo.toml
