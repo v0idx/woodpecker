@@ -67,15 +67,24 @@ fn main() {
     match &cli.action {
         Some(v) => {
             match v {
-                Actions::Add(args) => todo_list.add_item(&args.item_name, &args.item_details),
+                Actions::Add(args) => {
+                    todo_list.add_item(&args.item_name, &args.item_details);
+                }
                 Actions::Remove(args) => {
                     todo_list.remove_item(args.item_id);
                 }
                 Actions::Info(args) => {
                     todo_list.item_info(args.item_id);
                 }
-                Actions::Modify(_args) => {
-                    println!("modify used");
+                Actions::Modify(args) => {
+                    let mode = match args.target {
+                        Some(v) => match v {
+                            Targets::Name => 1,
+                            Targets::Description => 2,
+                        },
+                        None => 3,
+                    };
+                    todo_list.modify_item(args.item_id, mode);
                 }
                 Actions::List => {
                     todo_list.display_list();

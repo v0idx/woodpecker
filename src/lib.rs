@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
 use std::fs::File;
-use std::io::Write;
+use std::io::{Write, stdin, stdout};
 use std::path::Path;
 
 const APP_INFO: AppInfo = AppInfo {
@@ -184,6 +184,106 @@ impl TodoList {
         match item.modified {
             Some(v) => println!("Item modified on: {}", v),
             None => println!("Unmodified item"),
+        }
+    }
+
+    fn handle_input() -> String {
+        let mut input: String = String::new();
+        stdout().flush().unwrap();
+        match stdin().read_line(&mut input) {
+            Ok(_) => input,
+            Err(e) => {
+                println!("Unable to read input, aborting.\n{e}");
+                "".to_string()
+            }
+        }
+    }
+
+    pub fn modify_item(&mut self, item_id: u16, mode: u16) {
+        let repl_item: Option<ListItem> = match mode {
+            // Changing name of item.
+            1 => {
+                print!("Please enter new item name: ");
+                let input: String = TodoList::handle_input();
+                if input.is_empty() {
+                    None
+                } else {
+                    match self.list.get(&item_id) {
+                        Some(v) => Some(ListItem {
+                            name: input.trim().to_string(),
+                            description: v.description.clone(),
+                            creation_date: v.creation_date,
+                            modified: Some(Local::now()),
+                        }),
+                        None => {
+                            println!("Unable to retrieve item at {}, aborting", item_id);
+                            None
+                        }
+                    }
+                }
+            }
+            // Changing description of item.
+            2 => {
+                print!("Please enter new item description: ");
+                let input: String = TodoList::handle_input();
+
+                match self.list.get(&item_id) {
+                    Some(v) => Some(ListItem {
+                        name: v.name.clone(),
+                        description: input.trim().to_string(),
+                        creation_date: v.creation_date,
+                        modified: Some(Local::now()),
+                    }),
+                    None => {
+                        println!("Unable to retrieve item at {}, aborting.", item_id);
+                        None
+                    }
+                }
+            }
+            // Changing both.
+            3 => {
+                print!("Please enter item name: ");
+                let name: String = TodoList::handle_input();
+                if name.is_empty() {
+                    None
+                } else {
+                    print!("Please enter item description: ");
+                    let desc: String = TodoList::handle_input();
+                    match self.list.get(&item_id) {
+                        Some(v) => Some(ListItem {
+                            name: name.trim().to_string(),
+                            description: desc.trim().to_string(),
+                            creation_date: v.creation_date,
+                            modified: Some(Local::now()),
+                        }),
+                        None => {
+                            println!("Unable to retrieve item at {}, aborting.", item_id);
+                            None
+                        }
+                    }
+                }
+            }
+            _ => {
+                println!("How did we get here? Unspecified mode entered.");
+                None
+            }
+        };
+
+        match repl_item {
+            Some(v) => {
+                match self.list.remove(&item_id) {
+                    Some(_) => (),
+                    None => {
+                        println!("Error modifying item at {}, aborting.", item_id);
+                        return;
+                    }
+                }
+                self.list.insert(item_id, v);
+                println!("Successfully edited item at {}!", item_id);
+            }
+            None => {
+                println!("Please ensure a name is entered, items cannot have no name!");
+            }
         }
     }
 }
