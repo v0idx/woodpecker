@@ -1,6 +1,6 @@
 [package]
 name = "woodpecker-todo"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2024"
 description = "Command-line To-Do list application."
 repository = "https://github.com/v0idx/woodpecker"
