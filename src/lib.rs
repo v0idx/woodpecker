@@ -13,18 +13,27 @@ const APP_INFO: AppInfo = AppInfo {
     author: "Eloise Nash",
 };
 
+/// Representation of a List Item
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ListItem {
+    // Short name describing the TODO item
     name: String,
+    // Longer description of tasks involved, further information, etc.
     description: String,
+    // Date the item was made
     creation_date: DateTime<Local>,
+    // If the item was modified, then this will be the `DateTime<Local>` it was, otherwise `None`
     modified: Option<DateTime<Local>>,
 }
 
+/// Holds all current list information
 #[derive(Serialize, Deserialize)]
 pub struct TodoList {
+    // BTreeMap to allow for easier ordered display of list items from index
     list: BTreeMap<u16, ListItem>,
+    // Current location of the `list.mpk`
     file_path: String,
+    // Next available id, reset to 1 when list is emptied.
     next_id: u16,
 }
 
@@ -35,6 +44,12 @@ impl Default for TodoList {
 }
 
 impl TodoList {
+    /// # Initialises the current list.
+    ///
+    /// If a list is found at the standard location discovered by [app_dirs2](https://crates.io/crates/app_dirs2)
+    /// then it will be loaded into memory
+    ///
+    /// Otherwise a new list will be created, including the file required to store it on disk.
     pub fn init(&mut self) {
         let path = match app_root(AppDataType::UserData, &APP_INFO) {
             Ok(v) => v,
@@ -86,6 +101,9 @@ impl TodoList {
         }
     }
 
+    /// # Creates a new TodoList object
+    ///
+    /// Initialises the list completely empty, 'zeroing' the object, before initialisations are made.
     pub fn new() -> TodoList {
         let mut ret_list = TodoList {
             list: BTreeMap::new(),
@@ -96,6 +114,9 @@ impl TodoList {
         ret_list
     }
 
+    /// # Writes the list object to disk
+    ///
+    /// Writes to the path stored within the object, as `file_path`
     pub fn write_list(&self) {
         let path = Path::new(&self.file_path);
         let mut file = match File::create(path) {
@@ -115,6 +136,7 @@ impl TodoList {
         }
     }
 
+    /// # Displays all list items, in key order.
     pub fn display_list(&self) {
         if self.next_id != 1 {
             for (id, item) in &self.list {
@@ -125,6 +147,7 @@ impl TodoList {
         }
     }
 
+    /// # Adds a [ListItem] to the list
     pub fn add_item(&mut self, item_name: &String, item_description: &Option<String>) {
         let desc = match item_description {
             Some(v) => v,
@@ -142,6 +165,7 @@ impl TodoList {
         self.next_id += 1;
     }
 
+    /// # Removes a given [ListItem] from the list
     pub fn remove_item(&mut self, item_id: u16) {
         let item = match self.list.remove(&item_id) {
             Some(v) => v,
@@ -169,6 +193,7 @@ impl TodoList {
         }
     }
 
+    /// # Retrieve information about the requested [ListItem]
     pub fn item_info(&self, item_id: u16) {
         let item = match self.list.get(&item_id) {
             Some(v) => v,
@@ -199,6 +224,14 @@ impl TodoList {
         }
     }
 
+    /// Clears all [ListItem]'s from the list
+    pub fn clear_list(&mut self) {
+        self.list.clear();
+        println!("Time to start fresh!");
+        self.sanitise_ids();
+    }
+
+    /// Modify a given [ListItem]'s name or description
     pub fn modify_item(&mut self, item_id: u16, mode: u16) {
         let repl_item: Option<ListItem> = match mode {
             // Changing name of item.

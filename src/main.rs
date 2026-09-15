@@ -21,6 +21,8 @@ enum Actions {
     Modify(ModifyArgs),
     /// Display the current list, also occurs when left blank
     List,
+    /// Empty list
+    Clear,
 }
 
 #[derive(Args)]
@@ -88,6 +90,9 @@ fn main() {
                 }
                 Actions::List => {
                     todo_list.display_list();
+                }
+                Actions::Clear => {
+                    todo_list.clear_list();
                 }
             }
             todo_list.write_list();
