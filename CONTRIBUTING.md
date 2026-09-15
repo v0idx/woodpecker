@@ -87,12 +87,6 @@ As with bugs and errors, GitHub issues are used to track enhancement suggestions
 * You may want to include screenshots or animated GIFs which help to demonstrate the steps or point out the areas in which the suggestion is related to.
 * Explain why the enhancement would be useful to most users. You may also want to point out other projects that have solved similar issues, and that could serve as inspiration.
 
-#### Implementing Enhancements
-
-Any enhancements that you wish to be merged into main should always have appropriate unittests written for the functionality that they implement.
-
-Testing should be included in a `mod tests` at the end of the relevant source file.
-
 ### Style Guide
 
 #### Git Commit Messages
