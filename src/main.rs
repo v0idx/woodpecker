@@ -1,4 +1,5 @@
 use clap::{Args, Parser, Subcommand, ValueEnum};
+use woodpecker::TodoList;
 
 #[derive(Parser)]
 #[command(version, about, long_about=None)] // Read values from Cargo.toml
@@ -18,6 +19,8 @@ enum Actions {
     Info(InfoArgs),
     /// Modify the name and/or description of a list item
     Modify(ModifyArgs),
+    /// Display the current list, also occurs when left blank
+    List,
 }
 
 #[derive(Args)]
@@ -59,24 +62,29 @@ enum Targets {
 
 fn main() {
     let cli = Cli::parse();
+    let mut todo_list: TodoList = TodoList::new();
 
     match &cli.action {
-        Some(v) => match v {
-            Actions::Add(_args) => {
-                println!("add used");
+        Some(v) => {
+            match v {
+                Actions::Add(args) => todo_list.add_item(&args.item_name, &args.item_details),
+                Actions::Remove(args) => {
+                    todo_list.remove_item(args.item_id);
+                }
+                Actions::Info(args) => {
+                    todo_list.item_info(args.item_id);
+                }
+                Actions::Modify(_args) => {
+                    println!("modify used");
+                }
+                Actions::List => {
+                    todo_list.display_list();
+                }
             }
-            Actions::Remove(_args) => {
-                println!("remove used");
-            }
-            Actions::Info(_args) => {
-                println!("info used");
-            }
-            Actions::Modify(_args) => {
-                println!("modify used");
-            }
-        },
+            todo_list.write_list();
+        }
         None => {
-            println!("listing items");
+            todo_list.display_list();
         }
     }
 }
