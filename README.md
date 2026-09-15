@@ -19,7 +19,7 @@ For contribution please see `CONTRIBUTING.md`, any issues found are welcome to b
 
 ### Cargo
 
-Run `cargo install woodpecker` in your terminal of choice.
+Run `cargo install woodpecker-todo` in your terminal of choice.
 
 ## Usage
 
