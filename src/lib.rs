@@ -8,7 +8,7 @@ use std::fs::File;
 use std::io::{Write, stdin, stdout};
 use std::path::Path;
 
-const APP_INFO: AppInfo = AppInfo {
+pub const APP_INFO: AppInfo = AppInfo {
     name: "woodpecker",
     author: "Eloise Nash",
 };
