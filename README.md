@@ -8,7 +8,7 @@ A simple todo list application, written in rust. New repository for a complete o
 
 ## Local Development
 
-This codebase uses [prek](https://github.com/https://github.com/j178/prek/tree/master) for pre-commit linting and formatting, to get this working on your system, first follow the install guide in the prek repository readme.
+This codebase uses [prek](https://github.com/j178/prek/tree/master) for pre-commit linting and formatting, to get this working on your system, first follow the install guide in the prek repository readme.
 When prek is installed, open a terminal within this repository's source folder and run the command `prek init`. This will keep the current configuration and install the necessary pre-commit shim.
 
 ## Issues and Contribution
