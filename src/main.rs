@@ -11,11 +11,14 @@ struct Cli {
     action: Option<Actions>,
 
     /// Generate an example configuration file
-    #[arg(long)]
+    #[arg(long, exclusive(true))]
     generate_config: bool,
+
+    /// Optionally just add straight to the list! (Details unsupported when using this shorthand)
+    list_item: Option<Vec<String>>,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 enum Actions {
     /// Add an item to the todo list
     Add(AddArgs),
@@ -31,27 +34,28 @@ enum Actions {
     Clear,
 }
 
-#[derive(Args)]
+#[derive(Args, Debug)]
 struct AddArgs {
     /// Name of the list item
-    item_name: String,
+    item_name: Vec<String>,
     /// Optionally provide an item description for further information
-    item_details: Option<String>,
+    #[arg(short,long,num_args(1..))]
+    details: Option<Vec<String>>,
 }
 
-#[derive(Args)]
+#[derive(Args, Debug)]
 struct RmArgs {
     /// ID of the item to remove
     item_id: u16,
 }
 
-#[derive(Args)]
+#[derive(Args, Debug)]
 struct InfoArgs {
     /// ID of the item to retrieve further information of
     item_id: u16,
 }
 
-#[derive(Args)]
+#[derive(Args, Debug)]
 struct ModifyArgs {
     /// ID of the item to modify
     item_id: u16,
@@ -60,7 +64,7 @@ struct ModifyArgs {
     target: Option<Targets>,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
 enum Targets {
     /// Modify the `name` of the list item
     Name,
@@ -73,6 +77,17 @@ fn config_gen() {
     // Leaning towards the second option as it will provide more flexibility and can be done with serde most likely
     // Also need to decide upon a preferred layout for .conf, focusing on readability and ease-of-use
     // May need to roll own serialize/deserialize for nice looking .conf if serde doesn't play nicely
+
+    /*
+       What do we need to store in the .conf realistically
+       - default behaviours
+       - config file-path
+       - list file-path
+
+       // In Future \\
+       - network location for retrieval
+       - sync times (cron-like?)
+    */
 
     // Will move configuration logic to seperate source
     let path = match app_root(AppDataType::UserConfig, &woodpecker_todo::APP_INFO) {
@@ -93,12 +108,15 @@ fn main() {
     if cli.generate_config {
         println!("Generating example configuration file, ignoring any other arguments!");
         config_gen();
+    } else if cli.list_item.is_some() {
+        todo_list.add_item(&cli.list_item.unwrap(), &None);
+        todo_list.write_list();
     } else {
         match &cli.action {
             Some(v) => {
                 match v {
                     Actions::Add(args) => {
-                        todo_list.add_item(&args.item_name, &args.item_details);
+                        todo_list.add_item(&args.item_name, &args.details);
                     }
                     Actions::Remove(args) => {
                         todo_list.remove_item(args.item_id);

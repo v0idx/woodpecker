@@ -148,13 +148,14 @@ impl TodoList {
     }
 
     /// # Adds a [ListItem] to the list
-    pub fn add_item(&mut self, item_name: &String, item_description: &Option<String>) {
+    pub fn add_item(&mut self, item_name: &[String], item_description: &Option<Vec<String>>) {
         let desc = match item_description {
-            Some(v) => v,
+            Some(v) => &v.join(" "),
             None => &"".to_string(),
         };
+        let name_join = item_name.join(" ");
         let item = ListItem {
-            name: item_name.to_string(),
+            name: name_join,
             description: desc.to_string(),
             creation_date: Local::now(),
             modified: None,
