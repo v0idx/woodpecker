@@ -1,6 +1,4 @@
-use app_dirs2::*;
 use clap::{Args, Parser, Subcommand, ValueEnum};
-use std::path::Path;
 use woodpecker_todo::TodoList;
 
 #[derive(Parser)]
@@ -13,6 +11,10 @@ struct Cli {
     /// Generate an example configuration file
     #[arg(long, exclusive(true))]
     generate_config: bool,
+
+    /// Set config file path
+    #[arg(short, long, exclusive(true))]
+    config_path: Option<String>,
 
     /// Optionally just add straight to the list! (Details unsupported when using this shorthand)
     list_item: Option<Vec<String>>,
@@ -72,44 +74,18 @@ enum Targets {
     Description,
 }
 
-fn config_gen() {
-    // Need to decide whether to copy a bundled .conf OR to refactor this to then serialize defaults to a .conf
-    // Leaning towards the second option as it will provide more flexibility and can be done with serde most likely
-    // Also need to decide upon a preferred layout for .conf, focusing on readability and ease-of-use
-    // May need to roll own serialize/deserialize for nice looking .conf if serde doesn't play nicely
-
-    /*
-       What do we need to store in the .conf realistically
-       - default behaviours
-       - config file-path
-       - list file-path
-
-       // In Future \\
-       - network location for retrieval
-       - sync times (cron-like?)
-    */
-
-    // Will move configuration logic to seperate source
-    let path = match app_root(AppDataType::UserConfig, &woodpecker_todo::APP_INFO) {
-        Ok(v) => v,
-        Err(e) => panic!("Could not create/locate user config directory,\n{e}"),
-    };
-
-    let path = path.join(Path::new("woodpecker.conf"));
-    let path_display = path.display();
-
-    println!("We will place the config file @ {path_display}");
-}
-
 fn main() {
     let cli = Cli::parse();
     let mut todo_list: TodoList = TodoList::new();
-
+    // TODO: Rethink this ordering, currently required to be able to load a configuration file to create a configuration file
+    // Seems shortsighted
     if cli.generate_config {
         println!("Generating example configuration file, ignoring any other arguments!");
-        config_gen();
-    } else if cli.list_item.is_some() {
-        todo_list.add_item(&cli.list_item.unwrap(), &None);
+        todo_list.generate_config();
+    } else if let Some(config_path) = cli.config_path {
+        todo_list.set_config(config_path);
+    } else if let Some(list_item) = cli.list_item {
+        todo_list.add_item(&list_item, &None);
         todo_list.write_list();
     } else {
         match &cli.action {
