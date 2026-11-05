@@ -33,6 +33,39 @@ fn write_to_file(buf: &[u8], loc: &Path) -> WoodpeckerError {
     }
 }
 
+pub fn gen_def_config() {
+    let conf = Config::new(
+        &app_root(AppDataType::UserConfig, &APP_INFO)
+            .unwrap()
+            .join(Path::new("woodpecker.conf"))
+            .display()
+            .to_string(),
+        &app_root(AppDataType::UserData, &APP_INFO)
+            .unwrap()
+            .join(Path::new("list.mpk"))
+            .display()
+            .to_string(),
+    );
+
+    let toml = conf.to_scaffold().unwrap();
+    let path = Path::new(&conf.file.config_path);
+
+    match write_to_file(toml.as_bytes(), path) {
+        WoodpeckerError::Success => {
+            println!(
+                "Successfully written config file to {}!",
+                conf.file.config_path
+            )
+        }
+        WoodpeckerError::CreateFileError => {
+            println!("Couldn't create file at {}", conf.file.config_path)
+        }
+        WoodpeckerError::WriteFileError => {
+            println!("Couldn't write to file at {}", conf.file.config_path)
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, TomlScaffold, JsonSchema)]
 struct Config {
     file: FileConfig,
@@ -42,6 +75,7 @@ struct Config {
 #[derive(Serialize, Deserialize, TomlScaffold, JsonSchema)]
 struct FileConfig {
     config_path: String,
+    list_path: String,
 }
 
 #[derive(Serialize, Deserialize, TomlScaffold, JsonSchema)]
@@ -59,19 +93,13 @@ struct PersonaliseConfig {
 
 impl Default for Config {
     fn default() -> Self {
-        Self::new(
-            &app_root(AppDataType::UserConfig, &APP_INFO)
-                .unwrap()
-                .join(Path::new("woodpecker.conf"))
-                .display()
-                .to_string(),
-        )
+        Self::new(&"DEFAULT".to_string(), &"DEFAULT".to_string())
     }
 }
 
 impl Config {
-    fn new(conf_path: &String) -> Config {
-        let def_file = FileConfig::new(conf_path);
+    fn new(conf_path: &String, list_path: &String) -> Config {
+        let def_file = FileConfig::new(conf_path, list_path);
 
         return Config {
             file: def_file,
@@ -81,9 +109,10 @@ impl Config {
 }
 
 impl FileConfig {
-    fn new(path: &String) -> FileConfig {
+    fn new(conf_path: &String, list_path: &String) -> FileConfig {
         return FileConfig {
-            config_path: path.to_string(),
+            config_path: conf_path.to_string(),
+            list_path: list_path.to_string(),
         };
     }
 }
@@ -198,26 +227,33 @@ impl TodoList {
             self.next_id = 1;
         }
 
-        if self.config_path != "DEFAULT" {
-            let mut file = match File::open(&self.config_path) {
-                Ok(f) => f,
-                Err(e) => panic!(
-                    "Config file path is set, but couldn't open {}!\n{e}",
-                    self.config_path
-                ),
-            };
-            let mut conf_str = String::new();
-            match file.read_to_string(&mut conf_str) {
-                Ok(_) => (),
-                Err(e) => panic!("Couldn't read from {}!\n{e}", self.config_path),
-            };
+        match self.config_path.as_str() {
+            // Used when a config file hasn't been set yet
+            "DEFAULT" => {
+                self.config = Config::new(&self.config_path, &self.file_path);
+            }
+            // Default Case
+            _ => {
+                let mut file = match File::open(&self.config_path) {
+                    Ok(f) => f,
+                    Err(e) => panic!(
+                        "Config file path is set, but couldn't open {}!\n{e}",
+                        self.config_path
+                    ),
+                };
+                let mut conf_str = String::new();
+                match file.read_to_string(&mut conf_str) {
+                    Ok(_) => (),
+                    Err(e) => panic!("Couldn't read from {}!\n{e}", self.config_path),
+                };
 
-            self.config = match toml::from_str(&conf_str.to_string()) {
-                Ok(v) => v,
-                Err(_) => panic!(
-                    "Couldn't deserialize config file! Is it laid out correctly? Consider generating an example with --generate-config"
-                ),
-            };
+                self.config = match toml::from_str(&conf_str) {
+                    Ok(v) => v,
+                    Err(_) => panic!(
+                        "Couldn't deserialize config file! Is it laid out correctly? Consider generating an example with --generate-config"
+                    ),
+                }
+            }
         }
     }
 
@@ -250,7 +286,7 @@ impl TodoList {
             conf_path = self.config_path.clone();
         }
 
-        let conf = Config::new(&conf_path);
+        let conf = Config::new(&conf_path, &self.file_path);
         let toml = conf.to_scaffold().unwrap();
 
         let path = Path::new(&conf_path);

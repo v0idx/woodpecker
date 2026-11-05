@@ -76,13 +76,13 @@ enum Targets {
 
 fn main() {
     let cli = Cli::parse();
-    let mut todo_list: TodoList = TodoList::new();
-    // TODO: Rethink this ordering, currently required to be able to load a configuration file to create a configuration file
-    // Seems shortsighted
     if cli.generate_config {
         println!("Generating example configuration file, ignoring any other arguments!");
-        todo_list.generate_config();
-    } else if let Some(config_path) = cli.config_path {
+        woodpecker_todo::gen_def_config();
+        return;
+    }
+    let mut todo_list: TodoList = TodoList::new();
+    if let Some(config_path) = cli.config_path {
         todo_list.set_config(config_path);
     } else if let Some(list_item) = cli.list_item {
         todo_list.add_item(&list_item, &None);
