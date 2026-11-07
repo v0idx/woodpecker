@@ -89,6 +89,7 @@ struct PersonaliseConfig {
     modify_404: String,
     modify_200: String,
     modify_name_404: String,
+    sanitise_200: String,
 }
 
 impl Default for Config {
@@ -128,6 +129,7 @@ impl PersonaliseConfig {
             modify_200: "Successfully edited item at ~item_id~!".to_string(),
             modify_name_404: "Please ensure a name is entered, items cannot have no name!"
                 .to_string(),
+            sanitise_200: "You're all caught up, resetting ids to: ~start_id~".to_string(),
         };
     }
 }
@@ -338,7 +340,7 @@ impl TodoList {
                 println!("{}: {}", id, item.name);
             }
         } else {
-            println!("No items in list, you're all caught up!!");
+            println!("{}", self.config.personalisation.empty_list);
         }
     }
 
@@ -366,14 +368,33 @@ impl TodoList {
         let item = match self.list.remove(&item_id) {
             Some(v) => v.name,
             None => {
-                println!("Couldn't find item at {item_id}, try a different id?");
+                println!(
+                    "{}",
+                    self.config
+                        .personalisation
+                        .remove_404
+                        .replace("~item_id~", &item_id.to_string())
+                );
                 return;
             }
         };
-        println!("Peck Peck! Removed item at {item_id}, with name: {item}.",);
+        println!(
+            "{}",
+            self.config
+                .personalisation
+                .remove_200
+                .replace("~item_id~", &item_id.to_string())
+                .replace("~item~", &item)
+        );
 
         if self.sanitise_ids() {
-            println!("You're all caught up, resetting ids to: {}", self.next_id);
+            println!(
+                "{}",
+                self.config
+                    .personalisation
+                    .sanitise_200
+                    .replace("~start_id~", &self.next_id.to_string())
+            );
         }
     }
 
@@ -420,7 +441,7 @@ impl TodoList {
     /// Clears all [ListItem]'s from the list
     pub fn clear_list(&mut self) {
         self.list.clear();
-        println!("Time to start fresh!");
+        println!("{}", self.config.personalisation.clear_list);
         self.sanitise_ids();
     }
 
@@ -490,7 +511,7 @@ impl TodoList {
                 }
             }
             _ => {
-                println!("How did we get here? Unspecified mode entered.");
+                println!("{}", self.config.personalisation.modify_404);
                 None
             }
         };
@@ -505,10 +526,16 @@ impl TodoList {
                     }
                 }
                 self.list.insert(item_id, v);
-                println!("Successfully edited item at {}!", item_id);
+                println!(
+                    "{}",
+                    self.config
+                        .personalisation
+                        .modify_200
+                        .replace("~item_id~", &item_id.to_string())
+                );
             }
             None => {
-                println!("Please ensure a name is entered, items cannot have no name!");
+                println!("{}", self.config.personalisation.modify_name_404);
             }
         }
     }
