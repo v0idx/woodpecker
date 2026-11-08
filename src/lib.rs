@@ -267,7 +267,7 @@ impl TodoList {
             .unwrap()
             .join(Path::new("config-NEW"));
         println!(
-            "Couldn't deserialize config file! Would you like to generate an example configuration file? (Will be saved @ {}) (y/n)",
+            "Couldn't deserialize config file! Would you like to generate an example configuration file? (Will be saved @ {}) (Y/n)",
             cfg.display()
         );
         let mut buffer = String::new();
@@ -275,7 +275,11 @@ impl TodoList {
 
         stdin.read_line(&mut buffer).unwrap();
 
-        if ["y", "yes"].iter().any(|&s| s == buffer.to_lowercase()) {
+        if ["n", "no"].iter().any(|&s| s == buffer.to_lowercase()) {
+            println!(
+                "Make sure that your configuration file is set up correctly for the current version, an example can be found at the project repository!"
+            );
+        } else {
             println!("Generating example config file!");
             let conf = Config::new(&cfg.display().to_string(), &self.file_path);
             let toml = conf.to_scaffold().unwrap();
@@ -291,10 +295,6 @@ impl TodoList {
                     println!("Couldn't write to file at {}", cfg.display())
                 }
             }
-        } else {
-            println!(
-                "Make sure that your configuration file is set up correctly for the current version, an example can be found at the project repository!"
-            );
         }
     }
 
