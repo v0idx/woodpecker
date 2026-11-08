@@ -1,17 +1,140 @@
 use app_dirs2::*;
 use chrono::{DateTime, Local};
 use rmp_serde::{Deserializer, Serializer};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
 use std::fs::File;
-use std::io::{Write, stdin, stdout};
+use std::io;
+use std::io::{Write, prelude::*, stdin, stdout};
 use std::path::Path;
+use std::process::exit;
+use toml_scaffold::TomlScaffold;
 
 const APP_INFO: AppInfo = AppInfo {
     name: "woodpecker",
     author: "Eloise Nash",
 };
+
+enum WoodpeckerError {
+    Success,
+    CreateFileError,
+    WriteFileError,
+}
+
+fn write_to_file(buf: &[u8], loc: &Path) -> WoodpeckerError {
+    let mut file = match File::create(loc) {
+        Ok(f) => f,
+        Err(_) => return WoodpeckerError::CreateFileError,
+    };
+
+    match file.write_all(buf) {
+        Ok(_) => return WoodpeckerError::Success,
+        Err(_) => return WoodpeckerError::WriteFileError,
+    }
+}
+
+pub fn gen_def_config() {
+    let conf = Config::new(
+        &app_root(AppDataType::UserConfig, &APP_INFO)
+            .unwrap()
+            .join(Path::new("woodpecker.conf"))
+            .display()
+            .to_string(),
+        &app_root(AppDataType::UserData, &APP_INFO)
+            .unwrap()
+            .join(Path::new("list.mpk"))
+            .display()
+            .to_string(),
+    );
+
+    let toml = conf.to_scaffold().unwrap();
+    let path = Path::new(&conf.file.config_path);
+
+    match write_to_file(toml.as_bytes(), path) {
+        WoodpeckerError::Success => {
+            println!(
+                "Successfully written config file to {}!",
+                conf.file.config_path
+            )
+        }
+        WoodpeckerError::CreateFileError => {
+            println!("Couldn't create file at {}", conf.file.config_path)
+        }
+        WoodpeckerError::WriteFileError => {
+            println!("Couldn't write to file at {}", conf.file.config_path)
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, TomlScaffold, JsonSchema)]
+struct Config {
+    file: FileConfig,
+    personalisation: PersonaliseConfig,
+}
+
+#[derive(Serialize, Deserialize, TomlScaffold, JsonSchema)]
+struct FileConfig {
+    config_path: String,
+    list_path: String,
+}
+
+#[derive(Serialize, Deserialize, TomlScaffold, JsonSchema)]
+struct PersonaliseConfig {
+    /// Configuration Struct defining strings to change, values wrapped in '~' are used in interporation
+    /// These aren't required, but can be used if you wish. Only values wrapped are available per-string.
+    empty_list: String,
+    remove_200: String,
+    remove_404: String,
+    clear_list: String,
+    modify_404: String,
+    modify_200: String,
+    modify_name_404: String,
+    sanitise_200: String,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self::new(&"DEFAULT".to_string(), &"DEFAULT".to_string())
+    }
+}
+
+impl Config {
+    fn new(conf_path: &String, list_path: &String) -> Config {
+        let def_file = FileConfig::new(conf_path, list_path);
+
+        return Config {
+            file: def_file,
+            personalisation: PersonaliseConfig::new(),
+        };
+    }
+}
+
+impl FileConfig {
+    fn new(conf_path: &String, list_path: &String) -> FileConfig {
+        return FileConfig {
+            config_path: conf_path.to_string(),
+            list_path: list_path.to_string(),
+        };
+    }
+}
+
+impl PersonaliseConfig {
+    fn new() -> PersonaliseConfig {
+        return PersonaliseConfig {
+            empty_list: "No items in list, you're all caught up!!".to_string(),
+            remove_200: "Peck Peck! Removed item at ~item_id~, with name: ~item~.".to_string(),
+            remove_404: "Couldn't find item at ~item_id~, try a different id?".to_string(),
+            clear_list: "Time to start fresh!".to_string(),
+            modify_404: "How did we get here? Unspecified mode entered.".to_string(),
+            modify_200: "Successfully edited item at ~item_id~!".to_string(),
+            modify_name_404: "Please ensure a name is entered, items cannot have no name!"
+                .to_string(),
+            sanitise_200: "You're all caught up, resetting ids to: ~start_id~".to_string(),
+        };
+    }
+}
 
 /// Representation of a List Item
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -35,6 +158,11 @@ pub struct TodoList {
     file_path: String,
     // Next available id, reset to 1 when list is emptied.
     next_id: u16,
+    // Config file path
+    config_path: String,
+    // Configuration for current instance
+    #[serde(skip_serializing, skip_deserializing)]
+    config: Config,
 }
 
 impl Default for TodoList {
@@ -74,6 +202,7 @@ impl TodoList {
                         };
                         self.list = BTreeMap::new();
                         self.file_path = path_display.to_string();
+                        self.config_path = "DEFAULT".to_string();
                         self.next_id = 1;
                     } else {
                         let mut de = Deserializer::new(&buf[..]);
@@ -81,6 +210,7 @@ impl TodoList {
                             Ok(v) => {
                                 self.list = v.list;
                                 self.file_path = v.file_path;
+                                self.config_path = v.config_path;
                                 self.next_id = v.next_id;
                             }
                             Err(e) => panic!("Couldn't deserialze list file, aborting...\n{e}"),
@@ -97,7 +227,74 @@ impl TodoList {
 
             self.list = BTreeMap::new();
             self.file_path = path_display.to_string();
+            self.config_path = "DEFAULT".to_string();
             self.next_id = 1;
+        }
+
+        match self.config_path.as_str() {
+            // Used when a config file hasn't been set yet
+            "DEFAULT" => {
+                self.config = Config::new(&self.config_path, &self.file_path);
+            }
+            // Default Case
+            _ => {
+                let mut file = match File::open(&self.config_path) {
+                    Ok(f) => f,
+                    Err(e) => panic!(
+                        "Config file path is set, but couldn't open {}!\n{e}",
+                        self.config_path
+                    ),
+                };
+                let mut conf_str = String::new();
+                match file.read_to_string(&mut conf_str) {
+                    Ok(_) => (),
+                    Err(e) => panic!("Couldn't read from {}!\n{e}", self.config_path),
+                };
+
+                self.config = match toml::from_str(&conf_str) {
+                    Ok(v) => v,
+                    Err(_) => {
+                        self.create_extra_config();
+                        exit(1);
+                    }
+                }
+            }
+        }
+    }
+
+    fn create_extra_config(&self) {
+        let cfg = app_root(AppDataType::UserConfig, &APP_INFO)
+            .unwrap()
+            .join(Path::new("config-NEW"));
+        println!(
+            "Couldn't deserialize config file! Would you like to generate an example configuration file? (Will be saved @ {}) (Y/n)",
+            cfg.display()
+        );
+        let mut buffer = String::new();
+        let stdin = io::stdin();
+
+        stdin.read_line(&mut buffer).unwrap();
+
+        if ["n", "no"].iter().any(|&s| s == buffer.to_lowercase()) {
+            println!(
+                "Make sure that your configuration file is set up correctly for the current version, an example can be found at the project repository!"
+            );
+        } else {
+            println!("Generating example config file!");
+            let conf = Config::new(&cfg.display().to_string(), &self.file_path);
+            let toml = conf.to_scaffold().unwrap();
+
+            match write_to_file(toml.as_bytes(), cfg.as_path()) {
+                WoodpeckerError::Success => {
+                    println!("Successfully written config file to {}!", cfg.display())
+                }
+                WoodpeckerError::CreateFileError => {
+                    println!("Couldn't create file at {}", cfg.display())
+                }
+                WoodpeckerError::WriteFileError => {
+                    println!("Couldn't write to file at {}", cfg.display())
+                }
+            }
         }
     }
 
@@ -108,10 +305,49 @@ impl TodoList {
         let mut ret_list = TodoList {
             list: BTreeMap::new(),
             file_path: String::from(""),
+            config_path: String::from(""),
+            config: Config::default(),
             next_id: 1,
         };
         TodoList::init(&mut ret_list);
         ret_list
+    }
+
+    /// # Generates a default configuration file
+    pub fn generate_config(&mut self) {
+        let conf_path: String;
+        if self.config_path.as_str() == "DEFAULT" {
+            conf_path = match app_root(AppDataType::UserConfig, &APP_INFO) {
+                Ok(v) => v.join(Path::new("woodpecker.conf")).display().to_string(),
+                Err(e) => panic!("Could not create/locate user config directory,\n{e}"),
+            };
+            self.config_path = conf_path.to_string();
+            self.write_list();
+        } else {
+            conf_path = self.config_path.clone();
+        }
+
+        let conf = Config::new(&conf_path, &self.file_path);
+        let toml = conf.to_scaffold().unwrap();
+
+        let path = Path::new(&conf_path);
+
+        match write_to_file(toml.as_bytes(), path) {
+            WoodpeckerError::Success => {
+                println!("Successfully written config file to {conf_path}!")
+            }
+            WoodpeckerError::CreateFileError => println!("Couldn't create file at {conf_path}"),
+            WoodpeckerError::WriteFileError => println!("Couldn't write to file at {conf_path}"),
+        }
+    }
+
+    /// # Set's the TodoList config path
+    ///
+    /// The value set here is stored within the *.mpk file
+    pub fn set_config(&mut self, conf: String) {
+        self.config_path = conf;
+        println!("woodpecker config filepath set to {}", self.config_path);
+        self.write_list()
     }
 
     /// # Writes the list object to disk
@@ -143,18 +379,19 @@ impl TodoList {
                 println!("{}: {}", id, item.name);
             }
         } else {
-            println!("No items in list, you're all caught up!!");
+            println!("{}", self.config.personalisation.empty_list);
         }
     }
 
     /// # Adds a [ListItem] to the list
-    pub fn add_item(&mut self, item_name: &String, item_description: &Option<String>) {
+    pub fn add_item(&mut self, item_name: &[String], item_description: &Option<Vec<String>>) {
         let desc = match item_description {
-            Some(v) => v,
+            Some(v) => &v.join(" "),
             None => &"".to_string(),
         };
+        let name_join = item_name.join(" ");
         let item = ListItem {
-            name: item_name.to_string(),
+            name: name_join,
             description: desc.to_string(),
             creation_date: Local::now(),
             modified: None,
@@ -168,19 +405,35 @@ impl TodoList {
     /// # Removes a given [ListItem] from the list
     pub fn remove_item(&mut self, item_id: u16) {
         let item = match self.list.remove(&item_id) {
-            Some(v) => v,
+            Some(v) => v.name,
             None => {
-                println!("Couldn't find item at {item_id}, try a different id?");
+                println!(
+                    "{}",
+                    self.config
+                        .personalisation
+                        .remove_404
+                        .replace("~item_id~", &item_id.to_string())
+                );
                 return;
             }
         };
         println!(
-            "Peck Peck! Removed item at {item_id}, with name: {}.",
-            item.name
+            "{}",
+            self.config
+                .personalisation
+                .remove_200
+                .replace("~item_id~", &item_id.to_string())
+                .replace("~item~", &item)
         );
 
         if self.sanitise_ids() {
-            println!("You're all caught up, resetting ids to: {}", self.next_id);
+            println!(
+                "{}",
+                self.config
+                    .personalisation
+                    .sanitise_200
+                    .replace("~start_id~", &self.next_id.to_string())
+            );
         }
     }
 
@@ -227,7 +480,7 @@ impl TodoList {
     /// Clears all [ListItem]'s from the list
     pub fn clear_list(&mut self) {
         self.list.clear();
-        println!("Time to start fresh!");
+        println!("{}", self.config.personalisation.clear_list);
         self.sanitise_ids();
     }
 
@@ -297,7 +550,7 @@ impl TodoList {
                 }
             }
             _ => {
-                println!("How did we get here? Unspecified mode entered.");
+                println!("{}", self.config.personalisation.modify_404);
                 None
             }
         };
@@ -312,10 +565,16 @@ impl TodoList {
                     }
                 }
                 self.list.insert(item_id, v);
-                println!("Successfully edited item at {}!", item_id);
+                println!(
+                    "{}",
+                    self.config
+                        .personalisation
+                        .modify_200
+                        .replace("~item_id~", &item_id.to_string())
+                );
             }
             None => {
-                println!("Please ensure a name is entered, items cannot have no name!");
+                println!("{}", self.config.personalisation.modify_name_404);
             }
         }
     }
