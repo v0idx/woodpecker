@@ -1,6 +1,8 @@
 # Woodpecker
 
-![maintenance-status](https://img.shields.io/badge/maintenance-actively--developed-brightgreen.svg)
+![maintenance-status](https://img.shields.io/badge/maintenance-migrated-orange.svg)
+
+## This project has been migrated to [Codeberg](https://codeberg.org/twoforjoy/woodpecker). Please refer there for future updates
 
 ## Description
 
