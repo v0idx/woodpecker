@@ -12,10 +12,7 @@ use std::path::Path;
 use std::process::exit;
 use toml_scaffold::TomlScaffold;
 
-const APP_INFO: AppInfo = AppInfo {
-    name: "woodpecker",
-    author: "Eloise Nash",
-};
+mod info;
 
 enum WoodpeckerError {
     Success,
@@ -37,12 +34,12 @@ fn write_to_file(buf: &[u8], loc: &Path) -> WoodpeckerError {
 
 pub fn gen_def_config() {
     let conf = Config::new(
-        &app_root(AppDataType::UserConfig, &APP_INFO)
+        &app_root(AppDataType::UserConfig, &info::APP_INFO)
             .unwrap()
             .join(Path::new("woodpecker.conf"))
             .display()
             .to_string(),
-        &app_root(AppDataType::UserData, &APP_INFO)
+        &app_root(AppDataType::UserData, &info::APP_INFO)
             .unwrap()
             .join(Path::new("list.mpk"))
             .display()
@@ -179,7 +176,7 @@ impl TodoList {
     ///
     /// Otherwise a new list will be created, including the file required to store it on disk.
     pub fn init(&mut self) {
-        let path = match app_root(AppDataType::UserData, &APP_INFO) {
+        let path = match app_root(AppDataType::UserData, &info::APP_INFO) {
             Ok(v) => v,
             Err(e) => panic!("Could not create/locate user data directory,\n{e}"),
         };
@@ -263,7 +260,7 @@ impl TodoList {
     }
 
     fn create_extra_config(&self) {
-        let cfg = app_root(AppDataType::UserConfig, &APP_INFO)
+        let cfg = app_root(AppDataType::UserConfig, &info::APP_INFO)
             .unwrap()
             .join(Path::new("config-NEW"));
         println!(
@@ -317,7 +314,7 @@ impl TodoList {
     pub fn generate_config(&mut self) {
         let conf_path: String;
         if self.config_path.as_str() == "DEFAULT" {
-            conf_path = match app_root(AppDataType::UserConfig, &APP_INFO) {
+            conf_path = match app_root(AppDataType::UserConfig, &info::APP_INFO) {
                 Ok(v) => v.join(Path::new("woodpecker.conf")).display().to_string(),
                 Err(e) => panic!("Could not create/locate user config directory,\n{e}"),
             };
